@@ -1,13 +1,6 @@
 # Droid Agent SDK
 
-SDK for multi-agent collaboration with Factory Droid CLI.
-
-## Why?
-
-Building multi-agent systems is hard. This SDK provides:
-- **Session management** - Create, resume, and manage Droid sessions
-- **Agent communication** - Simple CLI tools for inter-agent messaging  
-- **State management** - Redis-backed state for coordination
+Communication layer for Factory Droid CLI. Pure Python, zero dependencies.
 
 ## Installation
 
@@ -17,85 +10,122 @@ pip install -e .
 
 ## Quick Start
 
-### 1. Python API (for launching agents)
-
 ```python
-from droid_agent_sdk import Swarm
+from droid_agent_sdk import DroidSession
 import asyncio
 
 async def main():
-    async with Swarm(pr_number="123", repo="owner/repo") as swarm:
-        # Spawn agents
-        orch = await swarm.spawn("orchestrator", model="claude-opus-4-5-20251101")
-        opus = await swarm.spawn("opus", model="claude-opus-4-5-20251101")
-        codex = await swarm.spawn("codex", model="gpt-5.2")
-        
-        # Send initial prompts
-        await orch.send("You are the orchestrator...")
-        await opus.send("Review PR #123...")
-        
-        print(swarm.session_ids)
+    async with DroidSession(
+        name="agent",
+        model="claude-opus-4-5-20251101",
+        pr_number="123",
+    ) as session:
+        await session.send("Hello, review this PR...")
 
 asyncio.run(main())
 ```
 
-### 2. CLI Tools (for agents to use)
+## JSON-RPC Protocol
 
-```bash
-# Agent sends message to another agent
-droid-sdk send orchestrator "Review complete, no issues found"
+SDK wraps the Droid CLI's stream-jsonrpc interface:
 
-# State management
-droid-sdk set stage 2
-droid-sdk get stage
+### Session Lifecycle
 
-# Check status
-droid-sdk status
-droid-sdk agents
-droid-sdk alive opus
-droid-sdk logs opus -f
-```
+| Method | Function | Description |
+|--------|----------|-------------|
+| `droid.initialize_session` | `initialize_session_request()` | Create new session |
+| `droid.load_session` | `load_session_request()` | Resume existing session |
+| `droid.interrupt_session` | `interrupt_session_request()` | Interrupt current execution |
+| `droid.update_session_settings` | `update_session_settings_request()` | Update session settings |
+
+### Messages
+
+| Method | Function | Description |
+|--------|----------|-------------|
+| `droid.add_user_message` | `add_user_message_request()` | Send user message |
+
+### Permissions
+
+| Method | Function | Description |
+|--------|----------|-------------|
+| `droid.request_permission` | `request_permission_request()` | Grant/deny tool permission |
+
+### MCP (Model Context Protocol)
+
+| Method | Function | Description |
+|--------|----------|-------------|
+| `droid.authenticate_mcp_server` | `authenticate_mcp_server_request()` | MCP server auth |
+| `droid.retry_mcp_server` | `retry_mcp_server_request()` | Retry MCP connection |
+| `droid.toggle_mcp_server` | `toggle_mcp_server_request()` | Enable/disable MCP server |
+| `droid.clear_mcp_auth` | `clear_mcp_auth_request()` | Clear MCP auth |
+
+### Notification Types
+
+Droid sends `droid.session_notification` with these types:
+
+| Type | Description |
+|------|-------------|
+| `droid_working_state_changed` | State: idle/streaming_assistant_message |
+| `create_message` | New message created |
+| `session_title_updated` | Session title changed |
+| `thinking_text_delta` | Streaming thinking content |
+| `assistant_text_delta` | Streaming response content |
+| `mcp_status_changed` | MCP server status changed |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  SKILL.md（Agent Knowledge）                            │
-│  - Role definition, workflow stages                     │
-│  - Tools: droid-sdk send/set/get                       │
-├─────────────────────────────────────────────────────────┤
-│  SDK CLI（Agent Runtime Tools）                         │
-│  - droid-sdk send orchestrator "message"               │
-│  - droid-sdk set stage 2                               │
-├─────────────────────────────────────────────────────────┤
-│  SDK Python API（Launch Scripts）                       │
-│  - Swarm().spawn("opus", model="...")                  │
-│  - session.send(prompt)                                │
-├─────────────────────────────────────────────────────────┤
-│  Transport Layer                                        │
-│  - FIFO pipes + JSON-RPC protocol + Redis state        │
-└─────────────────────────────────────────────────────────┘
+droid-agent-sdk/
+├── protocol.py      # JSON-RPC message construction
+├── transport.py     # FIFO communication
+├── daemon_start.py  # Daemon for new session (initialize_session)
+├── daemon_resume.py # Daemon for resume (load_session)
+├── session.py       # DroidSession class
+├── swarm.py         # Multi-session management (in memory)
+└── events.py        # Event types
 ```
 
-## CLI Reference
+## Usage Examples
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `send <agent> <msg>` | Send message | `droid-sdk send orchestrator "done"` |
-| `set <key> <value>` | Set state | `droid-sdk set stage 2` |
-| `get <key>` | Get state | `droid-sdk get stage` |
-| `status` | Show swarm | `droid-sdk status` |
-| `agents` | List agents | `droid-sdk agents` |
-| `alive <agent>` | Check alive | `droid-sdk alive opus` |
-| `logs <agent>` | Show logs | `droid-sdk logs opus -f` |
+### Low-level Protocol
 
-## Environment Variables
+```python
+from droid_agent_sdk import (
+    initialize_session_request,
+    add_user_message_request,
+    interrupt_session_request,
+)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DROID_PR_NUMBER` | PR number | Yes |
-| `DROID_AGENT_NAME` | Current agent | For `send` |
-| `DROID_REPO` | Repository | No |
+# Build JSON-RPC requests
+req = initialize_session_request(machine_id="myhost", cwd="/path")
+print(req.to_json())
+```
+
+### Session Management
+
+```python
+from droid_agent_sdk import DroidSession
+
+session = DroidSession(name="opus", model="claude-opus-4-5-20251101", pr_number="123")
+session_id = await session.start()
+
+await session.send("Review this code...")
+await session.interrupt()
+
+session.cleanup()
+```
+
+### Multi-Session (Swarm)
+
+```python
+from droid_agent_sdk import Swarm
+
+async with Swarm(pr_number="123") as swarm:
+    opus = await swarm.spawn("opus", model="claude-opus-4-5-20251101")
+    codex = await swarm.spawn("codex", model="gpt-5.2")
+    
+    await swarm.send_to("opus", "codex", "Please review...")
+```
 
 ## License
 
