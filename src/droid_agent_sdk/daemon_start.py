@@ -17,26 +17,33 @@ DROID = Path.home() / ".local" / "bin" / "droid"
 
 def main():
     if len(sys.argv) < 6:
-        print("Usage: python -m droid_agent_sdk.daemon_start <name> <model> <pr> <cwd> <auto>")
+        print(
+            "Usage: python -m droid_agent_sdk.daemon_start <name> <model> <pr> <cwd> <auto>"
+        )
         sys.exit(1)
-    
+
     name = sys.argv[1]
     model = sys.argv[2]
     pr_number = sys.argv[3]
     cwd = sys.argv[4]
     auto_level = sys.argv[5]
-    
+
     fifo = f"/tmp/duo-{pr_number}-{name}"
     log = f"/tmp/duo-{pr_number}-{name}.log"
-    
+
     log_file = open(log, "a", buffering=1)
     proc = subprocess.Popen(
         [
-            str(DROID), "exec",
-            "--input-format", "stream-jsonrpc",
-            "--output-format", "stream-jsonrpc",
-            "-m", model,
-            "--auto", auto_level,
+            str(DROID),
+            "exec",
+            "--input-format",
+            "stream-jsonrpc",
+            "--output-format",
+            "stream-jsonrpc",
+            "-m",
+            model,
+            "--auto",
+            auto_level,
             "--allow-background-processes",
         ],
         stdin=subprocess.PIPE,
@@ -47,7 +54,7 @@ def main():
         cwd=cwd,
         env=os.environ.copy(),
     )
-    
+
     # Send initialize_session
     init_req = {
         "jsonrpc": "2.0",
@@ -59,7 +66,7 @@ def main():
     }
     proc.stdin.write(json.dumps(init_req) + "\n")
     proc.stdin.flush()
-    
+
     # Main loop: FIFO -> droid stdin
     while True:
         try:

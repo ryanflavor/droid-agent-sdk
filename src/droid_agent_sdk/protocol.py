@@ -30,34 +30,36 @@ FACTORY_API_VERSION = "1.0.0"
 @dataclass
 class JsonRpcRequest:
     """JSON-RPC request message."""
-    
+
     method: str
     params: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: f"req-{int(time.time() * 1000)}")
-    
+
     def to_json(self) -> str:
-        return json.dumps({
-            "jsonrpc": "2.0",
-            "type": "request",
-            "factoryApiVersion": FACTORY_API_VERSION,
-            "method": self.method,
-            "params": self.params,
-            "id": self.id,
-        })
+        return json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "type": "request",
+                "factoryApiVersion": FACTORY_API_VERSION,
+                "method": self.method,
+                "params": self.params,
+                "id": self.id,
+            }
+        )
 
 
 @dataclass
 class JsonRpcResponse:
     """JSON-RPC response message."""
-    
+
     id: str
     result: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
-    
+
     @property
     def is_error(self) -> bool:
         return self.error is not None
-    
+
     @classmethod
     def from_json(cls, data: str | dict) -> JsonRpcResponse:
         if isinstance(data, str):
@@ -72,10 +74,10 @@ class JsonRpcResponse:
 @dataclass
 class JsonRpcNotification:
     """JSON-RPC notification message."""
-    
+
     method: str
     params: dict[str, Any] = field(default_factory=dict)
-    
+
     @classmethod
     def from_json(cls, data: str | dict) -> JsonRpcNotification:
         if isinstance(data, str):
@@ -103,6 +105,7 @@ def parse_message(line: str) -> JsonRpcResponse | JsonRpcNotification | None:
 # =============================================================================
 # Session lifecycle
 # =============================================================================
+
 
 def initialize_session_request(machine_id: str, cwd: str) -> JsonRpcRequest:
     """初始化新 session"""
@@ -152,6 +155,7 @@ def update_session_settings_request(
 # Messages
 # =============================================================================
 
+
 def add_user_message_request(text: str) -> JsonRpcRequest:
     """发送用户消息"""
     return JsonRpcRequest(
@@ -164,13 +168,14 @@ def add_user_message_request(text: str) -> JsonRpcRequest:
 # Permissions
 # =============================================================================
 
+
 def request_permission_request(
     tool_name: str,
     action: str = "allow",
     remember: bool = False,
 ) -> JsonRpcRequest:
     """请求工具权限
-    
+
     Args:
         tool_name: Tool name to grant/deny permission
         action: "allow" or "deny"
@@ -190,6 +195,7 @@ def request_permission_request(
 # =============================================================================
 # MCP (Model Context Protocol)
 # =============================================================================
+
 
 def authenticate_mcp_server_request(
     server_name: str,
