@@ -40,7 +40,7 @@ from .session import DroidSession
 from .swarm import Swarm
 from .transport import FIFOTransport
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core classes

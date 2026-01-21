@@ -30,17 +30,18 @@ def test_agent_message_format():
     )
     
     formatted = msg.format()
-    assert "<from:opus>" in formatted
+    assert '<MESSAGE from="opus" to="orchestrator">' in formatted
     assert "Review complete" in formatted
-    assert "</from:opus>" in formatted
+    assert "</MESSAGE>" in formatted
 
 
 def test_agent_message_parse():
-    text = "<from:opus>\nReview complete, no issues found.\n</from:opus>"
+    text = '<MESSAGE from="opus" to="orchestrator">\nReview complete, no issues found.\n</MESSAGE>'
     msg = AgentMessage.parse(text)
     
     assert msg is not None
     assert msg.from_agent == "opus"
+    assert msg.to_agent == "orchestrator"
     assert msg.content == "Review complete, no issues found."
 
 
